@@ -160,5 +160,9 @@ private:
 
     WCHAR m_scPlayPause[6];
 
-    ULONGLONG m_ullTikcount;
+    static ULONGLONG m_ullTickcount;
+    static ULONGLONG m_ullLastTickcount;
+
+    INT m_LastStyle;
+    INT m_LastFrameRate;
 };

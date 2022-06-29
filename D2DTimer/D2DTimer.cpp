@@ -10,8 +10,14 @@ using namespace std;
 
 
 #define MAX_LOADSTRING 100
+
 WCHAR szTitle[MAX_LOADSTRING];                  // The title bar text
 WCHAR szWindowClass[MAX_LOADSTRING];            // the main window class name
+
+
+ULONGLONG D2DTimer::m_ullTickcount = 0;
+ULONGLONG D2DTimer::m_ullLastTickcount = 0;
+
 
 
 //
@@ -55,10 +61,11 @@ D2DTimer::D2DTimer() :
     m_pRenderTarget(NULL),
     m_pTextFormat(NULL),
     m_pRedBrush(NULL),
-    m_ullTikcount(0),
-    m_fFontSize(50),
+    m_fFontSize(65),
     m_eStyle(StyleType::Timer),
-    m_eSpan(FrameRateSpan::By60)
+    m_eSpan(FrameRateSpan::By60),
+    m_LastStyle(IDM_STYLE_TIMER),
+    m_LastFrameRate(IDM_FPS_60)
 {
     wcscpy(m_scTimer, L"00:00:00.000\0");
     wcscpy(m_scFormatTimer, L"%02d:%02d:%02d.%03d\0");
@@ -133,8 +140,8 @@ HRESULT D2DTimer::Initialize()
             WS_OVERLAPPEDWINDOW,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
-            static_cast<UINT>(ceil(640.f * dpiX / 96.f)),
-            static_cast<UINT>(ceil(480.f * dpiY / 96.f)),
+            static_cast<UINT>(ceil(600 * dpiX / 96.f)),
+            static_cast<UINT>(ceil(300.f * dpiY / 96.f)),
             NULL,
             NULL,
             HINST_THISCOMPONENT,
@@ -444,11 +451,9 @@ LRESULT CALLBACK D2DTimer::WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARA
                             {
                                 case StyleType::Timer:
                                 {
-                                    ULONGLONG now = GetTickCount64();
+                                    pApp->m_ullTickcount = GetTickCount64() - pApp->m_ullLastTickcount;
 
-                                    ULONGLONG elasped = now - pApp->m_ullTikcount;
-
-                                    ULONGLONG temp = elasped;
+                                    ULONGLONG temp = pApp->m_ullTickcount;
                                     SHORT hours = temp / 3600000;
 
                                     temp %= 3600000;
@@ -496,12 +501,19 @@ LRESULT CALLBACK D2DTimer::WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARA
                         case IDM_STYLE_CLOCK:
                         case IDM_STYLE_TIMESTAMP:
                         {
-                            CheckMenuRadioItem(hMenu, IDM_STYLE_TIMER, IDM_STYLE_TIMESTAMP, wmId, MF_BYCOMMAND | MF_CHECKED);
-                            pApp->m_eStyle = (StyleType)(wmId - IDM_STYLE_TIMER);
+                            if (wmId != pApp->m_LastStyle)
+                            {
+                                pApp->m_LastStyle = wmId;
 
-                            RECT rc;
-                            GetClientRect(hwnd, &rc);
-                            InvalidateRect(hwnd, &rc, FALSE);
+                                pApp->m_ullLastTickcount = GetTickCount64() - pApp->m_ullTickcount;
+
+                                CheckMenuRadioItem(hMenu, IDM_STYLE_TIMER, IDM_STYLE_TIMESTAMP, wmId, MF_BYCOMMAND | MF_CHECKED);
+                                pApp->m_eStyle = (StyleType)(wmId - IDM_STYLE_TIMER);
+
+                                RECT rc;
+                                GetClientRect(hwnd, &rc);
+                                InvalidateRect(hwnd, &rc, FALSE);
+                            }
                         }
                         wasHandled = true;
                         result = 0;
@@ -523,7 +535,7 @@ LRESULT CALLBACK D2DTimer::WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARA
                                     }
                                     break;
                                 case IDM_FONT_DEFAULT:
-                                    pApp->m_fFontSize = 50;
+                                    pApp->m_fFontSize = 65;
                                     break;
                             }
                             if (pApp->m_pDWriteFactory != NULL)
@@ -572,14 +584,19 @@ LRESULT CALLBACK D2DTimer::WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARA
                         case IDM_FPS_120:
                         case IDM_FPS_240:
                         {
-                            pApp->m_eSpan = (FrameRateSpan)(wmId - IDM_FPS_0);
-
-                            CheckMenuRadioItem(hMenu, IDM_FPS_0, IDM_FPS_1, wmId, MF_BYCOMMAND | MF_CHECKED);
-                            GetMenuStringW(hMenu, IDM_ACTION_PAUSE, pApp->m_scPlayPause, 7, MF_BYCOMMAND);
-                            if (lstrcmpW(pApp->m_scPlayPause, L"&Pause") == 0)
+                            if (wmId != pApp->m_LastFrameRate)
                             {
-                                KillTimer(hwnd, IDT_TIMER_RENDER);
-                                SetTimer(hwnd, IDT_TIMER_RENDER, pApp->m_eSpan, (TIMERPROC)D2DTimer::WndProc);
+                                pApp->m_LastFrameRate = wmId;
+
+                                pApp->m_eSpan = (FrameRateSpan)(wmId - IDM_FPS_0);
+
+                                CheckMenuRadioItem(hMenu, IDM_FPS_0, IDM_FPS_1, wmId, MF_BYCOMMAND | MF_CHECKED);
+                                GetMenuStringW(hMenu, IDM_ACTION_PAUSE, pApp->m_scPlayPause, 7, MF_BYCOMMAND);
+                                if (lstrcmpW(pApp->m_scPlayPause, L"&Pause") == 0)
+                                {
+                                    KillTimer(hwnd, IDT_TIMER_RENDER);
+                                    SetTimer(hwnd, IDT_TIMER_RENDER, pApp->m_eSpan, (TIMERPROC)D2DTimer::WndProc);
+                                }
                             }
                         }
                         wasHandled = true;
@@ -597,7 +614,8 @@ LRESULT CALLBACK D2DTimer::WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARA
                             }
                             else
                             {
-                                pApp->m_ullTikcount = GetTickCount64();
+                                pApp->m_ullLastTickcount = GetTickCount64() - pApp->m_ullTickcount;
+
                                 ModifyMenu(hMenu, IDM_ACTION_PAUSE, MF_BYCOMMAND | MF_STRING, IDM_ACTION_PAUSE, L"&Pause");
                                 SetTimer(hwnd, IDT_TIMER_RENDER, pApp->m_eSpan, (TIMERPROC)D2DTimer::WndProc);
                             }
@@ -608,6 +626,8 @@ LRESULT CALLBACK D2DTimer::WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARA
                         case IDM_ACTION_CLEAR:
                         {
                             KillTimer(hwnd, IDT_TIMER_RENDER);
+
+                            pApp->m_ullTickcount = 0;
 
                             switch (pApp->m_eStyle)
                             {
