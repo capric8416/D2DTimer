@@ -510,6 +510,19 @@ LRESULT CALLBACK D2DTimer::WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARA
                                 CheckMenuRadioItem(hMenu, IDM_STYLE_TIMER, IDM_STYLE_TIMESTAMP, wmId, MF_BYCOMMAND | MF_CHECKED);
                                 pApp->m_eStyle = (StyleType)(wmId - IDM_STYLE_TIMER);
 
+                                switch (wmId)
+                                {
+                                    case IDM_STYLE_TIMER:
+                                        SetWindowText(pApp->m_hwnd, L"D2D Timer");
+                                        break;
+                                    case IDM_STYLE_CLOCK:
+                                        SetWindowText(pApp->m_hwnd, L"D2D Clock");
+                                        break;
+                                    case IDM_STYLE_TIMESTAMP:
+                                        SetWindowText(pApp->m_hwnd, L"D2D Timestamp");
+                                        break;
+                                }
+
                                 RECT rc;
                                 GetClientRect(hwnd, &rc);
                                 InvalidateRect(hwnd, &rc, FALSE);
